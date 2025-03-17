@@ -53,7 +53,8 @@ func main() {
 
 	reqId := mixin.RandomTraceID()
 	amount := decimal.NewFromFloat(0.00000001)
-	err = kitCli.TransferOneWithRetry(ctx, &kit.TransferOneRequest{
+	var request *mixin.SafeTransactionRequest
+	request, err = kitCli.TransferOne(ctx, &kit.TransferOneRequest{
 		RequestId: reqId,
 		AssetId:   ASSET_CNB,
 		Member:    config.AppID,
@@ -64,10 +65,6 @@ func main() {
 		log.Panicf("transfer: %+v \n", err)
 	}
 
-	request, err := kitCli.SafeReadTransactionRequest(context.TODO(), reqId)
-	if err != nil {
-		log.Panicf("read safe transaction: %+v \n", err)
-	}
 	log.Printf("request: %+v \n\n\n", request)
 
 	log.Printf("check Tx: https://mixin.space/tx/%s \n", request.TransactionHash)

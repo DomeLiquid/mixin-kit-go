@@ -19,16 +19,12 @@ var (
 	ErrNotEnoughUtxos        = errors.New("not enough utxos")
 	ErrInscriptionNotFound   = errors.New("inscription not found")
 	ErrMultInscriptionsFound = errors.New("multiple inscriptions found")
-)
-
-var (
-	defaultMaxRetry = 3
-
-	AGGREGRATE_UTXO_MEMO = "arrgegate utxos"
+	ErrMaxUtxoExceeded       = errors.New("Maximum utxo exceeded")
 )
 
 const (
-	MAX_UTXO_NUM = 255
+	AGGREGRATE_UTXO_MEMO = "arrgegate utxos"
+	MAX_UTXO_NUM         = 255
 )
 
 type ClientWrapper struct {
@@ -217,20 +213,7 @@ func (c *ClientWrapper) SyncArrgegateUtxos(ctx context.Context, assetId string) 
 	return
 }
 
-func (m *ClientWrapper) TransferOneWithRetry(ctx context.Context, req *TransferOneRequest) error {
-	var err error
-	for i := 0; i < defaultMaxRetry; i++ {
-		if _, err = m.transferOne(ctx, req); err != nil {
-			time.Sleep(time.Second << i)
-			continue
-		} else {
-			return nil
-		}
-	}
-	return err
-}
-
-func (c *ClientWrapper) transferOne(ctx context.Context, req *TransferOneRequest) (*mixin.SafeTransactionRequest, error) {
+func (c *ClientWrapper) TransferOne(ctx context.Context, req *TransferOneRequest) (*mixin.SafeTransactionRequest, error) {
 	var err error
 	var utxos []*mixin.SafeUtxo
 
@@ -350,9 +333,13 @@ func (c *ClientWrapper) transferOne(ctx context.Context, req *TransferOneRequest
 	return req1, nil
 }
 
-func (m *ClientWrapper) TransferManyWithRetry(ctx context.Context, req *TransferManyRequest) error {
+/* req.MemberAmount length No limit */
+func (m *ClientWrapper) TransferManyN(ctx context.Context, req *TransferManyRequest) error {
 	if len(req.MemberAmount) < MAX_UTXO_NUM {
-		return m.transferManyWithRetry(ctx, req)
+		_, err := m.TransferMany(ctx, req)
+		if err != nil {
+			return err
+		}
 	} else {
 		memberAmountArray := buildTransferMany(req.MemberAmount)
 		for i, memberAmount := range memberAmountArray {
@@ -363,7 +350,7 @@ func (m *ClientWrapper) TransferManyWithRetry(ctx context.Context, req *Transfer
 				Memo:         req.Memo,
 			}
 
-			err := m.transferManyWithRetry(ctx, req)
+			_, err := m.TransferMany(ctx, req)
 			if err != nil {
 				return err
 			}
@@ -372,20 +359,12 @@ func (m *ClientWrapper) TransferManyWithRetry(ctx context.Context, req *Transfer
 	return nil
 }
 
-func (m *ClientWrapper) transferManyWithRetry(ctx context.Context, req *TransferManyRequest) error {
-	var err error
-	for i := 0; i < defaultMaxRetry; i++ {
-		if _, err = m.transferMany(ctx, req); err != nil {
-			time.Sleep(time.Second << i)
-			continue
-		} else {
-			return nil
-		}
+// req.MemberAmount max 255
+func (m *ClientWrapper) TransferMany(ctx context.Context, req *TransferManyRequest) (*mixin.SafeTransactionRequest, error) {
+	if len(req.MemberAmount) > MAX_UTXO_NUM {
+		return nil, ErrMaxUtxoExceeded
 	}
-	return err
-}
 
-func (m *ClientWrapper) transferMany(ctx context.Context, req *TransferManyRequest) (*mixin.SafeTransactionRequest, error) {
 	var utxos []*mixin.SafeUtxo
 	var err error
 	utxos, err = m.SyncArrgegateUtxos(ctx, req.AssetId)
@@ -518,14 +497,17 @@ func buildTransferMany(memberAmounts []MemberAmount) [][]MemberAmount {
 	return result
 }
 
-func (m *ClientWrapper) InscriptionTransfer(ctx context.Context, req *InscriptionTransferRequest) error {
+func (m *ClientWrapper) InscriptionTransfer(ctx context.Context, req *InscriptionTransferRequest) (req1 *mixin.SafeTransactionRequest, err error) {
 	var utxos []*mixin.SafeUtxo
-	utxos, _ = m.Client.SafeListUtxos(ctx, mixin.SafeListUtxoOption{
+	utxos, err = m.SafeListUtxos(ctx, mixin.SafeListUtxoOption{
 		Asset:     req.AssetId,
 		State:     mixin.SafeUtxoStateUnspent,
 		Threshold: 1,
 		Limit:     500,
 	})
+	if err != nil {
+		return
+	}
 
 	for i := range utxos {
 		if utxos[i].InscriptionHash.String() == req.Inscription {
@@ -534,11 +516,13 @@ func (m *ClientWrapper) InscriptionTransfer(ctx context.Context, req *Inscriptio
 	}
 
 	if len(utxos) == 0 {
-		return ErrInscriptionNotFound
+		err = ErrInscriptionNotFound
+		return
 	}
 
 	if len(utxos) > 1 {
-		return ErrMultInscriptionsFound
+		err = ErrMultInscriptionsFound
+		return
 	}
 
 	b := mixin.NewSafeTransactionBuilder(utxos)
@@ -549,23 +533,23 @@ func (m *ClientWrapper) InscriptionTransfer(ctx context.Context, req *Inscriptio
 		Amount:  utxos[0].Amount,
 	}
 
-	tx, err := m.Client.MakeTransaction(ctx, b, []*mixin.TransactionOutput{txOutout})
+	tx, err := m.MakeTransaction(ctx, b, []*mixin.TransactionOutput{txOutout})
 	if err != nil {
-		return err
+		return
 	}
 
 	raw, err := tx.Dump()
 	if err != nil {
-		return err
+		return
 	}
 
 	// 3. create transaction
-	request, err := m.Client.SafeCreateTransactionRequest(ctx, &mixin.SafeTransactionRequestInput{
+	request, err := m.SafeCreateTransactionRequest(ctx, &mixin.SafeTransactionRequestInput{
 		RequestID:      req.RequestId,
 		RawTransaction: raw,
 	})
 	if err != nil {
-		return err
+		return
 	}
 	// 4. sign transaction
 	err = mixin.SafeSignTransaction(
@@ -575,26 +559,23 @@ func (m *ClientWrapper) InscriptionTransfer(ctx context.Context, req *Inscriptio
 		0,
 	)
 	if err != nil {
-		return err
+		return
 	}
 	signedRaw, err := tx.Dump()
 	if err != nil {
-		return err
+		return
 	}
 
 	// 5. submit transaction
-	_, err = m.Client.SafeSubmitTransactionRequest(ctx, &mixin.SafeTransactionRequestInput{
+	_, err = m.SafeSubmitTransactionRequest(ctx, &mixin.SafeTransactionRequestInput{
 		RequestID:      req.RequestId,
 		RawTransaction: signedRaw,
 	})
 	if err != nil {
-		return err
+		return
 	}
 
 	// 6. read transaction
-	_, err = m.Client.SafeReadTransactionRequest(ctx, req.RequestId)
-	if err != nil {
-		return err
-	}
-	return nil
+	req1, err = m.SafeReadTransactionRequest(ctx, req.RequestId)
+	return
 }
