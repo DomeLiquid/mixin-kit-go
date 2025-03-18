@@ -22,7 +22,7 @@ var (
 	ErrNotEnoughUtxos        = errors.New("not enough utxos")
 	ErrInscriptionNotFound   = errors.New("inscription not found")
 	ErrMultInscriptionsFound = errors.New("multiple inscriptions found")
-	ErrMaxUtxoExceeded       = errors.New("Maximum utxo exceeded")
+	ErrMaxUtxoExceeded       = errors.New("maximum utxo exceeded")
 )
 
 const (
@@ -90,14 +90,15 @@ func NewMixinClientWrapper(keystore *mixin.Keystore, spendKeyStr string) (*Clien
 	return clientWrapper, nil
 }
 
+type Web3Response[T any] struct {
+	Data T `json:"data"`
+}
+
 /*
 GET /markets/:coin_idcoin_id: string, coin_id from GET /markets. OR mixin asset idresponse:
 */
 func (m *ClientWrapper) GetAssetInfo(ctx context.Context, assetId string) (*MarketAssetInfo, error) {
-	var response struct {
-		Data MarketAssetInfo `json:"data"`
-	}
-
+	var response Web3Response[MarketAssetInfo]
 	_, err := m.client.R().SetContext(ctx).SetPathParams(map[string]string{
 		"coin_id": assetId,
 	}).SetResult(&response).Get("/markets/{coin_id}")
@@ -111,9 +112,7 @@ func (m *ClientWrapper) GetAssetInfo(ctx context.Context, assetId string) (*Mark
 GET /markets/:coin_id/price-history?type=${type}paramdescriptioncoin_idcoin_id from GET /markets, or mixin asset idtype1D, 1W, 1M, YTD, ALLresponse:
 */
 func (m *ClientWrapper) GetPriceHistory(ctx context.Context, assetId string, t HistoryPriceType) (*HistoricalPrice, error) {
-	var response struct {
-		Data HistoricalPrice `json:"data"`
-	}
+	var response Web3Response[HistoricalPrice]
 
 	_, err := m.client.R().
 		SetContext(ctx).
@@ -131,24 +130,20 @@ func (m *ClientWrapper) GetPriceHistory(ctx context.Context, assetId string, t H
 }
 
 func (m *ClientWrapper) Web3Tokens(ctx context.Context) (tokens []TokenView, err error) {
-	var result struct {
-		Data []TokenView `json:"data"`
-	}
+	var response Web3Response[[]TokenView]
 
 	err = m.Web3Client.Get(
 		ctx,
 		"/web3/tokens",
 		"source=mixin",
-		&result,
+		&response,
 	)
 
-	return result.Data, err
+	return response.Data, err
 }
 
 func (m *ClientWrapper) Web3Quote(ctx context.Context, req QuoteRequest) (resp QuoteResponseView, err error) {
-	var result struct {
-		Data QuoteResponseView `json:"data"`
-	}
+	var response Web3Response[QuoteResponseView]
 
 	err = m.Web3Client.DoRequest(
 		ctx,
@@ -156,25 +151,22 @@ func (m *ClientWrapper) Web3Quote(ctx context.Context, req QuoteRequest) (resp Q
 		"/web3/quote",
 		req.ToQuery(),
 		nil,
-		&result,
+		&response,
 	)
 
-	return result.Data, err
+	return response.Data, err
 }
 
 func (m *ClientWrapper) Web3Swap(ctx context.Context, req SwapRequest) (resp SwapResponseView, err error) {
-	var result struct {
-		Data SwapResponseView `json:"data"`
-	}
-
+	var response Web3Response[SwapResponseView]
 	err = m.Web3Client.Post(
 		ctx,
 		"/web3/swap",
 		req,
-		&result,
+		&response,
 	)
 
-	return result.Data, err
+	return response.Data, err
 }
 
 func (m *ClientWrapper) GetWeb3SwapOrder(ctx context.Context, orderId string) (order SwapOrder, err error) {

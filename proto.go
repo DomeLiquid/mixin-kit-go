@@ -73,26 +73,26 @@ type (
 	}
 
 	QuoteRequest struct {
-		InputMint  string `json:"inputMint"`
-		OutputMint string `json:"outputMint"`
-		Amount     string `json:"amount"`
+		InputMint  string          `json:"inputMint"`
+		OutputMint string          `json:"outputMint"`
+		Amount     decimal.Decimal `json:"amount"`
 	}
 
 	QuoteResponseView struct {
-		InputMint  string `json:"inputMint"`
-		InAmount   string `json:"inAmount"`
-		OutputMint string `json:"outputMint"`
-		OutAmount  string `json:"outAmount"`
-		Payload    string `json:"payload"`
+		InputMint  string          `json:"inputMint"`
+		InAmount   decimal.Decimal `json:"inAmount"`
+		OutputMint string          `json:"outputMint"`
+		OutAmount  decimal.Decimal `json:"outAmount"`
+		Payload    string          `json:"payload"`
 	}
 
 	SwapRequest struct {
-		Payer       string `json:"payer"`       // mixin user id
-		InputMint   string `json:"inputMint"`   // mixin asset id
-		InputAmount string `json:"inputAmount"` // mixin amount
-		OutputMint  string `json:"outputMint"`  // mixin asset id
-		Payload     string `json:"payload"`     // QuoteResponseView.Payload
-		Referral    string `json:"referral"`    // optional
+		Payer       string          `json:"payer"`       // mixin user id
+		InputMint   string          `json:"inputMint"`   // mixin asset id
+		InputAmount decimal.Decimal `json:"inputAmount"` // mixin amount
+		OutputMint  string          `json:"outputMint"`  // mixin asset id
+		Payload     string          `json:"payload"`     // QuoteResponseView.Payload
+		Referral    string          `json:"referral"`    // optional
 	}
 
 	SwapResponseView struct {
@@ -101,12 +101,12 @@ type (
 	}
 
 	SwapTx struct {
-		Trace   string `json:"trace"`
-		Payee   string `json:"payee"` // 收款人
-		Asset   string `json:"asset"`
-		Amount  string `json:"amount"`
-		Memo    string `json:"memo"`
-		OrderId string `json:"orderId"`
+		Trace   string          `json:"trace"`
+		Payee   string          `json:"payee"` // 收款人
+		Asset   string          `json:"asset"`
+		Amount  decimal.Decimal `json:"amount"`
+		Memo    string          `json:"memo"`
+		OrderId string          `json:"orderId"`
 	}
 
 	SwapOrder struct {
@@ -174,11 +174,16 @@ func (s SwapResponseView) DecodeTx() (*SwapTx, error) {
 		return nil, fmt.Errorf("invalid uid in path: %s", tx.Path)
 	}
 
+	amount, err := decimal.NewFromString(query.Get("amount"))
+	if err != nil {
+		return nil, fmt.Errorf("invaild amount in query")
+	}
+
 	return &SwapTx{
 		Trace:   query.Get("trace"),
 		Payee:   uid,
 		Asset:   query.Get("asset"),
-		Amount:  query.Get("amount"),
+		Amount:  amount,
 		Memo:    query.Get("memo"),
 		OrderId: query.Get("memo"),
 	}, nil
