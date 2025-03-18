@@ -1,4 +1,4 @@
-package web3
+package kit
 
 import (
 	"fmt"

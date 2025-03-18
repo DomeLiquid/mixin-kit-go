@@ -3,13 +3,16 @@ package kit
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
 
+	bot "github.com/MixinNetwork/bot-api-go-client/v3"
 	"github.com/fox-one/mixin-sdk-go/v2"
 	"github.com/fox-one/mixin-sdk-go/v2/mixinnet"
+	"github.com/go-resty/resty/v2"
 	"github.com/gofrs/uuid/v5"
 	"github.com/shopspring/decimal"
 )
@@ -29,13 +32,16 @@ const (
 
 type ClientWrapper struct {
 	*mixin.Client
+	Web3Client
+
 	user     *mixin.User
 	SpendKey mixinnet.Key
+	client   *resty.Client
 
 	transferMutex sync.Mutex
 }
 
-// GenUuidFromStrings 根据多个字符串生成UUID
+// GenUuidFromStrings
 func GenUuidFromStrings(strs ...string) string {
 	var str string
 	for _, s := range strs {
@@ -58,7 +64,23 @@ func NewMixinClientWrapper(keystore *mixin.Keystore, spendKeyStr string) (*Clien
 	if err != nil {
 		return nil, err
 	}
+	su := &bot.SafeUser{
+		UserId:            keystore.ClientID,
+		SessionId:         keystore.SessionID,
+		SessionPrivateKey: keystore.SessionPrivateKey,
+		ServerPublicKey:   keystore.ServerPublicKey,
+		SpendPrivateKey:   spendKey.String(),
+	}
+
+	logger := slog.Default()
+	botCli := bot.NewDefaultClient(su, logger)
+
 	clientWrapper := &ClientWrapper{
+		Web3Client: NewWeb3Client(botCli),
+		client: resty.New().
+			SetHeader("Content-Type", "application/json").
+			SetBaseURL(MixinRouteApiPrefix).
+			SetTimeout(10 * time.Second),
 		Client:        client,
 		SpendKey:      spendKey,
 		user:          user,
@@ -66,6 +88,108 @@ func NewMixinClientWrapper(keystore *mixin.Keystore, spendKeyStr string) (*Clien
 	}
 
 	return clientWrapper, nil
+}
+
+/*
+GET /markets/:coin_idcoin_id: string, coin_id from GET /markets. OR mixin asset idresponse:
+*/
+func (m *ClientWrapper) GetAssetInfo(ctx context.Context, assetId string) (*MarketAssetInfo, error) {
+	var response struct {
+		Data MarketAssetInfo `json:"data"`
+	}
+
+	_, err := m.client.R().SetContext(ctx).SetPathParams(map[string]string{
+		"coin_id": assetId,
+	}).SetResult(&response).Get("/markets/{coin_id}")
+	if err != nil {
+		return nil, err
+	}
+	return &response.Data, nil
+}
+
+/*
+GET /markets/:coin_id/price-history?type=${type}paramdescriptioncoin_idcoin_id from GET /markets, or mixin asset idtype1D, 1W, 1M, YTD, ALLresponse:
+*/
+func (m *ClientWrapper) GetPriceHistory(ctx context.Context, assetId string, t HistoryPriceType) (*HistoricalPrice, error) {
+	var response struct {
+		Data HistoricalPrice `json:"data"`
+	}
+
+	_, err := m.client.R().
+		SetContext(ctx).
+		SetPathParams(map[string]string{
+			"coin_id": assetId,
+		}).
+		SetQueryParam("type", t.String()).
+		SetResult(&response).
+		Get("/markets/{coin_id}/price-history")
+
+	if err != nil {
+		return nil, err
+	}
+	return &response.Data, nil
+}
+
+func (m *ClientWrapper) Web3Tokens(ctx context.Context) (tokens []TokenView, err error) {
+	var result struct {
+		Data []TokenView `json:"data"`
+	}
+
+	err = m.Web3Client.Get(
+		ctx,
+		"/web3/tokens",
+		"source=mixin",
+		&result,
+	)
+
+	return result.Data, err
+}
+
+func (m *ClientWrapper) Web3Quote(ctx context.Context, req QuoteRequest) (resp QuoteResponseView, err error) {
+	var result struct {
+		Data QuoteResponseView `json:"data"`
+	}
+
+	err = m.Web3Client.DoRequest(
+		ctx,
+		"GET",
+		"/web3/quote",
+		req.ToQuery(),
+		nil,
+		&result,
+	)
+
+	return result.Data, err
+}
+
+func (m *ClientWrapper) Web3Swap(ctx context.Context, req SwapRequest) (resp SwapResponseView, err error) {
+	var result struct {
+		Data SwapResponseView `json:"data"`
+	}
+
+	err = m.Web3Client.Post(
+		ctx,
+		"/web3/swap",
+		req,
+		&result,
+	)
+
+	return result.Data, err
+}
+
+func (m *ClientWrapper) GetWeb3SwapOrder(ctx context.Context, orderId string) (order SwapOrder, err error) {
+	var result struct {
+		Data SwapOrder `json:"data"`
+	}
+
+	err = m.Web3Client.Get(
+		ctx,
+		"/web3/swap/orders/"+orderId,
+		"",
+		&result,
+	)
+
+	return result.Data, err
 }
 
 type TransferOneRequest struct {

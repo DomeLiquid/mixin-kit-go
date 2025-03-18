@@ -1,4 +1,4 @@
-package web3
+package kit
 
 import (
 	"bytes"
@@ -13,12 +13,31 @@ import (
 )
 
 const (
+	MixinRouteApiPrefix   = "https://api.route.mixin.one"
 	MixinRouteClientID    = "61cb8dd4-16b1-4744-ba0c-7b2d2e52fc59"
 	HeaderAccessTimestamp = "MR-ACCESS-TIMESTAMP"
 	HeaderAccessSign      = "MR-ACCESS-SIGN"
 	HeaderContentType     = "Content-Type"
 	ContentTypeJSON       = "application/json"
 )
+
+type HistoryPriceType uint8
+
+const (
+	PriceType1D HistoryPriceType = iota
+	PriceType1W
+	PriceType1M
+	PriceTypeYTD
+	PriceTypeALL
+)
+
+func (h HistoryPriceType) String() string {
+	return []string{"1D", "1W", "1M", "YTD", "ALL"}[h]
+}
+
+func InvalidPriceHistoryType(typ uint8) bool {
+	return typ > uint8(PriceTypeALL)
+}
 
 // Web3Client 接口定义
 type Web3Client interface {
@@ -57,7 +76,6 @@ func NewWeb3Client(botClient *bot.BotAuthClient, opts ...Web3ClientOption) Web3C
 	return client
 }
 
-// WithBaseURL 设置基础URL
 func WithBaseURL(url string) Web3ClientOption {
 	return func(c *web3ClientImpl) {
 		c.baseURL = url
@@ -65,14 +83,12 @@ func WithBaseURL(url string) Web3ClientOption {
 	}
 }
 
-// WithTimeout 设置超时时间
 func WithTimeout(timeout time.Duration) Web3ClientOption {
 	return func(c *web3ClientImpl) {
 		c.client.SetTimeout(timeout)
 	}
 }
 
-// WithRetry 设置重试策略
 func WithRetry(count int, waitTime time.Duration) Web3ClientOption {
 	return func(c *web3ClientImpl) {
 		c.client.SetRetryCount(count).
