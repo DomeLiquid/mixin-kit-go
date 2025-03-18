@@ -52,11 +52,15 @@ func main() {
 		log.Fatal("[GetWeb3Tokens] error: %+v\n", err)
 	}
 
+	for _, token := range tokens {
+		log.Printf("token: %+v\n", token)
+	}
+
 	// 2. 问价 0.1BTC -> ? SOL
 	quoteView, err := kitCli.Web3Quote(ctx, kit.QuoteRequest{
 		InputMint:  "c6d0c728-2624-429b-8e0d-d9d19b6592fa", // BTC
 		OutputMint: "64692c23-8971-4cf4-84a7-4dd1271dd887", // SOL
-		Amount:     decimal.NewFromFloat(0.1).String(),
+		Amount:     decimal.NewFromFloat(0.1),
 	})
 	if err != nil {
 		log.Fatal("web3 quote error: %+v\n", err)
@@ -68,7 +72,7 @@ func main() {
 		Payer:       kitCli.ClientID,
 		InputMint:   "c6d0c728-2624-429b-8e0d-d9d19b6592fa", // BTC
 		OutputMint:  "64692c23-8971-4cf4-84a7-4dd1271dd887", // SOL
-		InputAmount: "0.01",
+		InputAmount: decimal.NewFromFloat(0.01),
 		Payload:     quoteView.Payload,
 	})
 	if err != nil {
@@ -82,11 +86,6 @@ func main() {
 		log.Fatal("web3 decode tx error: %+v\n", err)
 	}
 
-	inputAmount, err := decimal.NewFromString(swapTx.Amount)
-	if err != nil {
-		log.Fatal("get inputAmount error: %+v\n", err)
-	}
-
 	// wait... then query order status
 	// 3.2 查询订单状态
 	swapOrder, err := kitCli.GetWeb3SwapOrder(ctx, swapTx.OrderId)
@@ -96,18 +95,20 @@ func main() {
 	log.Printf("swap order: %+v \n\n", swapOrder)
 
 	//  4. 向 Mixin Route 支付订单
-	safeTransactionRequest, err := kitCli.TransferOne(ctx, &kit.TransferOneRequest{
-		RequestId: swapTx.Trace,
-		AssetId:   swapTx.Asset,
-		Member:    swapTx.Payee,
-		Amount:    inputAmount,
-		Memo:      swapTx.Memo,
-	})
-	if err != nil {
-		log.Fatal("[TransferOne] error : %+v\n", err)
-	}
+	/*
+		safeTransactionRequest, err := kitCli.TransferOne(ctx, &kit.TransferOneRequest{
+			RequestId: swapTx.Trace,
+			AssetId:   swapTx.Asset,
+			Member:    swapTx.Payee,
+			Amount:    swapTx.Amount,
+			Memo:      swapTx.Memo,
+		})
+		if err != nil {
+			log.Fatal("[TransferOne] error : %+v\n", err)
+		}
 
-	log.Printf("safeTransactionRequest: %+v \n\n", safeTransactionRequest)
+		log.Printf("safeTransactionRequest: %+v \n\n", safeTransactionRequest)
+	*/
 	log.Printf("Waiting to check orderId: [%s] status...", swapTx.OrderId)
 
 	time.Sleep(10 * time.Second)
