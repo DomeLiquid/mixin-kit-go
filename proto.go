@@ -110,16 +110,16 @@ type (
 	}
 
 	SwapOrder struct {
-		OrderId        string          `json:"order_id" gorm:"type:varchar(36);not null;primary_key"`
-		UserId         string          `json:"user_id" gorm:"type:varchar(36);not null"`
-		AssetId        string          `json:"asset_id" gorm:"type:varchar(36);not null"`
-		ReceiveAssetId string          `json:"receive_asset_id" gorm:"type:varchar(36);not null"`
-		Amount         decimal.Decimal `json:"amount" gorm:"type:decimal(64,8);not null"`
-		ReceiveAmount  decimal.Decimal `json:"receive_amount" gorm:"type:decimal(64,8);not null"`
-		PaymentTraceId string          `json:"payment_trace_id" gorm:"type:varchar(36);not null"`
-		ReceiveTraceId string          `json:"receive_trace_id" gorm:"type:varchar(36);not null"`
-		State          SwapOrderState  `json:"state" gorm:"type:varchar(10);not null"`
-		CreatedAt      time.Time       `json:"created_at" gorm:"type:timestamp;not null"`
+		OrderId        string          `json:"order_id"`
+		UserId         string          `json:"user_id"`
+		AssetId        string          `json:"asset_id"`
+		ReceiveAssetId string          `json:"receive_asset_id"`
+		Amount         decimal.Decimal `json:"amount"`
+		ReceiveAmount  decimal.Decimal `json:"receive_amount"`
+		PaymentTraceId string          `json:"payment_trace_id"`
+		ReceiveTraceId string          `json:"receive_trace_id"`
+		State          SwapOrderState  `json:"state"`
+		CreatedAt      time.Time       `json:"created_at"`
 	}
 
 	ErrorResponse struct {
