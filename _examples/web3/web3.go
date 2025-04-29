@@ -8,11 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/DomeLiquid/mixin-kit-go/_examples"
 	"github.com/shopspring/decimal"
 
 	kit "github.com/DomeLiquid/mixin-kit-go"
-	"github.com/fox-one/mixin-sdk-go/v2"
 )
 
 var (
@@ -30,17 +28,12 @@ func main() {
 		log.Panicln(err)
 	}
 
-	var config _examples.Config
+	var config kit.Config
 	if err := json.NewDecoder(f).Decode(&config); err != nil {
 		log.Panicln(err)
 	}
 
-	kitCli, err := kit.NewMixinClientWrapper(&mixin.Keystore{
-		AppID:             config.AppID,
-		SessionID:         config.SessionID,
-		ServerPublicKey:   config.ServerPublicKey,
-		SessionPrivateKey: config.SessionPrivateKey,
-	}, config.SpendKey)
+	kitCli, err := kit.NewMixinClientWrapper(&config)
 	if err != nil {
 		log.Panicf("init client wrapper error: %+v \n", err)
 	}

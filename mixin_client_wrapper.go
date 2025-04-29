@@ -30,6 +30,14 @@ const (
 	MAX_UTXO_NUM         = 255
 )
 
+type Config struct {
+	AppID             string `json:"app_id"`
+	SessionID         string `json:"session_id"`
+	ServerPublicKey   string `json:"server_public_key"`
+	SessionPrivateKey string `json:"session_private_key"`
+	SpendKey          string `json:"spend_key"`
+}
+
 type ClientWrapper struct {
 	*mixin.Client
 	Web3Client
@@ -50,8 +58,13 @@ func GenUuidFromStrings(strs ...string) string {
 	return uuid.NewV5(uuid.NamespaceOID, str).String()
 }
 
-func NewMixinClientWrapper(keystore *mixin.Keystore, spendKeyStr string) (*ClientWrapper, error) {
-	client, err := mixin.NewFromKeystore(keystore)
+func NewMixinClientWrapper(config *Config) (*ClientWrapper, error) {
+	client, err := mixin.NewFromKeystore(&mixin.Keystore{
+		AppID:             config.AppID,
+		SessionID:         config.SessionID,
+		ServerPublicKey:   config.ServerPublicKey,
+		SessionPrivateKey: config.SessionPrivateKey,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -60,15 +73,16 @@ func NewMixinClientWrapper(keystore *mixin.Keystore, spendKeyStr string) (*Clien
 		return nil, err
 	}
 
+	spendKeyStr := config.SpendKey
 	spendKey, err := mixinnet.ParseKeyWithPub(spendKeyStr, user.SpendPublicKey)
 	if err != nil {
 		return nil, err
 	}
 	su := &bot.SafeUser{
-		UserId:            keystore.ClientID,
-		SessionId:         keystore.SessionID,
-		SessionPrivateKey: keystore.SessionPrivateKey,
-		ServerPublicKey:   keystore.ServerPublicKey,
+		UserId:            config.AppID,
+		SessionId:         config.SessionID,
+		SessionPrivateKey: config.SessionPrivateKey,
+		ServerPublicKey:   config.ServerPublicKey,
 		SpendPrivateKey:   spendKey.String(),
 	}
 
