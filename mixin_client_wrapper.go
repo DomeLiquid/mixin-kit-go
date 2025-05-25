@@ -40,6 +40,7 @@ type Config struct {
 
 type ClientWrapper struct {
 	*mixin.Client
+	Bot *bot.SafeUser
 	Web3Client
 
 	user     *mixin.User
@@ -78,7 +79,7 @@ func NewMixinClientWrapper(config *Config) (*ClientWrapper, error) {
 	if err != nil {
 		return nil, err
 	}
-	su := &bot.SafeUser{
+	safeUser := &bot.SafeUser{
 		UserId:            config.AppID,
 		SessionId:         config.SessionID,
 		SessionPrivateKey: config.SessionPrivateKey,
@@ -87,9 +88,10 @@ func NewMixinClientWrapper(config *Config) (*ClientWrapper, error) {
 	}
 
 	logger := slog.Default()
-	botCli := bot.NewDefaultClient(su, logger)
+	botCli := bot.NewDefaultClient(safeUser, logger)
 
 	clientWrapper := &ClientWrapper{
+		Bot:        safeUser,
 		Web3Client: NewWeb3Client(botCli),
 		client: resty.New().
 			SetHeader("Content-Type", "application/json").
