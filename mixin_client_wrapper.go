@@ -42,6 +42,7 @@ type ClientWrapper struct {
 	*mixin.Client
 	Bot *bot.SafeUser
 	Web3Client
+	ComputerClient *ComputerClient
 
 	user     *mixin.User
 	SpendKey mixinnet.Key
@@ -97,10 +98,11 @@ func NewMixinClientWrapper(config *Config) (*ClientWrapper, error) {
 			SetHeader("Content-Type", "application/json").
 			SetBaseURL(MixinRouteApiPrefix).
 			SetTimeout(10 * time.Second),
-		Client:        client,
-		SpendKey:      spendKey,
-		user:          user,
-		transferMutex: sync.Mutex{},
+		Client:         client,
+		SpendKey:       spendKey,
+		user:           user,
+		transferMutex:  sync.Mutex{},
+		ComputerClient: NewComputerClient(),
 	}
 
 	return clientWrapper, nil
